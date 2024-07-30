@@ -35,15 +35,8 @@ class YoloDetect(BaseOpenvinoModel):
         :return: the predicted results, tensor
         """
         # preprocess
-        image = raw_image = frame.copy()
-        image = self.letterbox(image)[0]
-        image = image.transpose(2, 0, 1)  # Convert HWC to CHW
-        image = np.ascontiguousarray(image)
-
-        # convert to tensor
-        input_tensor = image.astype(np.float32)  # uint8 to fp32
-        input_tensor /= 255.0  # 0 - 255 to 0.0 - 1.0
-        input_tensor = np.expand_dims(input_tensor, 0)
+        image = frame.copy()
+        input_tensor = self.preprocess(image)
 
         # predict
         result = self.model([input_tensor])
@@ -52,12 +45,24 @@ class YoloDetect(BaseOpenvinoModel):
 
         detections = self.postprocess(pred_boxes=boxes,
                                       input_hw=(input_hw[0], input_hw[1]),
-                                      orig_img=raw_image,
+                                      orig_img=image,
                                       min_conf_threshold=self.min_conf,
                                       nms_iou_threshold=self.min_iou)
 
         # {"det": [[x1, y1, x2, y2, score, label_id], ...]}
         return detections[0]["det"]
+
+    @staticmethod
+    def preprocess(img: np.ndarray) -> np.ndarray:
+        image = img.copy()
+        image = YoloDetect.letterbox(image)[0]
+        image = image.transpose(2, 0, 1)  # Convert HWC to CHW
+        image = np.ascontiguousarray(image)
+
+        # convert to tensor
+        input_tensor = image.astype(np.float32)  # uint8 to fp32
+        input_tensor /= 255.0  # 0 - 255 to 0.0 - 1.0
+        return np.expand_dims(input_tensor, 0)
 
     """
     Using the functions from https://docs.openvino.ai/2022.3/notebooks/230-yolov8-optimization-with-output.html
