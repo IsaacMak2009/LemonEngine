@@ -78,7 +78,22 @@ class Manipulator(BaseHardware):
         """
         Open the gripper.
 
+        for some different model of manipulator, you may be careful with this function,
+        recommend use set_gripper instead of open/close_gripper
+
         :param t: The time duration for the motion. Default is 1.0 second.
         :return:
         """
-        self.set_gripper(0.1, t)
+        self.set_gripper(0.01, t)
+
+    def close_gripper(self, t: float = 1.0):
+        """
+        Close the gripper.
+
+        for some different model of manipulator, you may be careful with this function,
+        recommend use set_gripper instead of open/close_gripper
+
+        :param t: The time duration for the motion. Default is 1.0 second.
+        :return:
+        """
+        self.set_gripper(-0.01, t)
