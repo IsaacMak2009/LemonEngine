@@ -174,4 +174,82 @@ class YoloSegment(BaseOpenvinoModel):
 
 
 class YoloPose(BaseOpenvinoModel):
-    pass
+    def __init__(self,
+                 model_name: str = "yolov8n-pose",
+                 device_name: str = "CPU",
+                 model_dir: Optional[str] = None,
+                 min_conf: float = 0.25,
+                 min_iou: float = 0.7,
+                 ) -> None:
+        super().__init__(model_name=model_name, models_dir=model_dir, device_name=device_name)
+        self.min_conf = min_conf
+        self.min_iou = min_iou
+
+    def predict(self, frame: np.ndarray) -> Tuple[torch.Tensor, torch.Tensor]:
+        # preprocess
+        image = frame.copy()
+        input_tensor = YoloDetect.preprocess(image)
+
+        # predict
+        result = self.model([input_tensor])
+        boxes = result[self.model.output(0)]
+        input_hw = input_tensor.shape[2:]
+
+        detections = self.postprocess(
+            pred_boxes=boxes,
+            input_hw=(input_hw[0], input_hw[1]),
+            orig_img=image,
+            min_conf_threshold=self.min_conf,
+            nms_iou_threshold=self.min_iou,
+        )
+
+        return detections[0]["box"], detections[0]["kpt"]
+
+    """
+    Using the function from https://docs.openvino.ai/2023.3/notebooks/230-yolov8-keypoint-detection-with-output.html
+    """
+
+    @staticmethod
+    def postprocess(
+            pred_boxes: np.ndarray,
+            input_hw: Tuple[int, int],
+            orig_img: np.ndarray,
+            min_conf_threshold: float = 0.25,
+            nms_iou_threshold: float = 0.45,
+            agnostic_nms: bool = False,
+            max_detections: int = 80,
+    ):
+        """
+        YOLOv8 model postprocessing function. Applied non-maximum suppression algorithm to detections and rescale boxes to original image size
+        Parameters:
+            pred_boxes (np.ndarray): model output prediction boxes
+            input_hw (np.ndarray): preprocessed image
+            orig_img (np.ndarray): image before preprocessing
+            min_conf_threshold (float, *optional*, 0.25): minimal accepted confidence for object filtering
+            nms_iou_threshold (float, *optional*, 0.45): minimal overlap score for removing objects duplicates in NMS
+            agnostic_nms (bool, *optional*, False): apply class agnostic NMS approach or not
+            max_detections (int, *optional*, 300):  maximum detections after NMS
+        Returns:
+           pred (List[Dict[str, np.ndarray]]): list of dictionary with det - detected boxes in format [x1, y1, x2, y2, score, label] and
+                                               kpt - 17 keypoints in format [x1, y1, score1]
+        """
+        predicts = ops.non_max_suppression(
+            torch.from_numpy(pred_boxes),
+            min_conf_threshold,
+            nms_iou_threshold,
+            nc=1,
+            agnostic=agnostic_nms,
+            max_det=max_detections,
+        )
+
+        results = []
+
+        kpt_shape = [17, 3]
+        for i, pred in enumerate(predicts):
+            shape = orig_img[i].shape if isinstance(orig_img, list) else orig_img.shape
+            pred[:, :4] = ops.scale_boxes(input_hw, pred[:, :4], shape).round()
+            pred_kpts = pred[:, 6:].view(len(pred), *kpt_shape) if len(pred) else pred[:, 6:]
+            pred_kpts = ops.scale_coords(input_hw, pred_kpts, shape)
+            results.append({"box": pred[:, :6].numpy(), 'kpt': pred_kpts.numpy()})
+
+        return results
