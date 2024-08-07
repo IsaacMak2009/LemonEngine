@@ -170,7 +170,102 @@ class YoloDetect(BaseOpenvinoModel):
 
 
 class YoloSegment(BaseOpenvinoModel):
-    pass
+
+    try:
+        scale_segments = ops.scale_segments
+    except AttributeError:
+        scale_segments = ops.scale_coords
+
+    def __init__(self, 
+                 model_name: str = "yolov8n-seg", 
+                 device_name: str = "CPU", 
+                 models_dir: Optional[str] = None) -> None:
+        super().__init__(model_name=model_name, models_dir=models_dir, device_name=device_name)
+        self.n_outputs = len(self.model.outputs)
+
+    def predict(self, frame: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        # preprocess
+        image = frame.copy()
+        input_tensor = YoloDetect.preprocess(image)
+        result = self.model([input_tensor])
+        boxes = result[self.model.output(0)]
+        masks = None
+        if self.n_outputs > 1:
+            masks = result[self.model.output(1)]
+        input_hw = input_tensor.shape[2:]
+        detections = self.postprocess(
+            pred_boxes=boxes, 
+            input_hw=input_hw, 
+            orig_img=image, 
+            pred_masks=masks
+        )
+
+        return detections[0]["det"], detections[0]["segment"]
+
+    """
+    Using the function from "https://docs.openvino.ai/2023.3/notebooks/230-yolov8-instance-segmentation-with-output.html"
+    """
+
+    @staticmethod
+    def postprocess(
+        pred_boxes:np.ndarray,
+        input_hw:Tuple[int, int],
+        orig_img:np.ndarray,
+        min_conf_threshold:float = 0.25,
+        nms_iou_threshold:float = 0.7,
+        agnostic_nms:bool = False,
+        max_detections:int = 300,
+        pred_masks:np.ndarray = None,
+        retina_mask:bool = False
+    ):
+        """
+        YOLOv8 model postprocessing function. Applied non maximum supression algorithm to detections and rescale boxes to original image size
+        Parameters:
+            pred_boxes (np.ndarray): model output prediction boxes
+            input_hw (np.ndarray): preprocessed image
+            orig_image (np.ndarray): image before preprocessing
+            min_conf_threshold (float, *optional*, 0.25): minimal accepted confidence for object filtering
+            nms_iou_threshold (float, *optional*, 0.45): minimal overlap score for removing objects duplicates in NMS
+            agnostic_nms (bool, *optiona*, False): apply class agnostic NMS approach or not
+            max_detections (int, *optional*, 300):  maximum detections after NMS
+            pred_masks (np.ndarray, *optional*, None): model ooutput prediction masks, if not provided only boxes will be postprocessed
+            retina_mask (bool, *optional*, False): retina mask postprocessing instead of native decoding
+        Returns:
+           pred (List[Dict[str, np.ndarray]]): list of dictionary with det - detected boxes in format [x1, y1, x2, y2, score, label] and
+                                               segment - segmentation polygons for each element in batch
+        """
+        # if pred_masks is not None:
+        #     nms_kwargs["nm"] = 32
+        preds = ops.non_max_suppression(
+            torch.from_numpy(pred_boxes),
+            min_conf_threshold,
+            nms_iou_threshold,
+            nc=80,
+            agnostic=agnostic_nms,
+            max_det=max_detections
+        )
+        results = []
+        proto = torch.from_numpy(pred_masks) if pred_masks is not None else None
+    
+        for i, pred in enumerate(preds):
+            shape = orig_img[i].shape if isinstance(orig_img, list) else orig_img.shape
+            if not len(pred):
+                results.append({"det": [], "segment": []})
+                continue
+            if proto is None:
+                pred[:, :4] = ops.scale_boxes(input_hw, pred[:, :4], shape).round()
+                results.append({"det": pred})
+                continue
+            if retina_mask:
+                pred[:, :4] = ops.scale_boxes(input_hw, pred[:, :4], shape).round()
+                masks = ops.process_mask_native(proto[i], pred[:, 6:], pred[:, :4], shape[:2])  # HWC
+                segments = [YoloSegment.scale_segments(input_hw, x, shape, normalize=False) for x in ops.masks2segments(masks)]
+            else:
+                masks = ops.process_mask(proto[i], pred[:, 6:], pred[:, :4], input_hw, upsample=True)
+                pred[:, :4] = ops.scale_boxes(input_hw, pred[:, :4], shape).round()
+                segments = [YoloSegment.scale_segments(input_hw, x, shape, normalize=False) for x in ops.masks2segments(masks)]
+            results.append({"det": pred[:, :6].numpy(), "segment": segments})
+        return results
 
 
 class YoloPose(BaseOpenvinoModel):
