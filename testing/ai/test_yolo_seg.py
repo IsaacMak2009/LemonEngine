@@ -7,7 +7,7 @@ from LemonEngine.ai import openvino as ov
 
 def main():
     cam = Camera("/camera/color/image_raw", "bgr8")
-    model = ov.YoloPose(min_conf=0.8, device_name="GPU")
+    model = ov.YoloSegment(device_name="GPU")
     rate = rospy.Rate(20)
 
     while not rospy.is_shutdown():
@@ -15,15 +15,13 @@ def main():
         frame = cam.get_frame()
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-        bboxs, keypoints = model.predict(rgb_frame)
-        for bbox, keypoint in zip(bboxs, keypoints):
+        bboxs, segments = model.predict(rgb_frame)
+        for bbox, segment in zip(bboxs, segments):
             x1, y1, x2, y2, conf, label = map(int, bbox)
             cv2.putText(frame, f"{label}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
-            for kpt in keypoint:
-                x, y, conf = map(int, kpt)
-                cv2.circle(frame, (x, y), 3, (0, 255, 0), -1)
+            frame = cv2.fillPoly(frame, [segment.astype(int)], (0, 255, 0))
         
 
         cv2.imshow("frame", frame)

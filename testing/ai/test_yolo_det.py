@@ -13,9 +13,11 @@ def main():
     while not rospy.is_shutdown():
         rate.sleep()
         frame = cam.get_frame()
-        results = model.predict(frame).tolist()
-        for result in results:
-            x1, y1, x2, y2, conf, label = map(int, result)
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        bboxs = model.predict(rgb_frame).tolist()
+        for bbox in bboxs:
+            x1, y1, x2, y2, conf, label = map(int, bbox)
+            cv2.putText(frame, f"{label}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
         cv2.imshow("frame", frame)
