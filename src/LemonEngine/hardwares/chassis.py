@@ -76,7 +76,7 @@ class Chassis(BaseHardware):
         """
         ...
 
-    def set_angular(self, x: float | Vector3, y: float = None, z: float = None) -> None:
+    def set_angular(self, x: Union[float, Vector3], y: float = None, z: float = None) -> None:
         """
         Set the angular velocity
         """
@@ -119,7 +119,7 @@ class Chassis(BaseHardware):
         """
         ...
 
-    def set_linear(self, x: float | Vector3, y: float = None, z: float = None) -> None:
+    def set_linear(self, x: Union[float, Vector3], y: float = None, z: float = None) -> None:
         """
         Set the linear velocity
         """
@@ -221,7 +221,7 @@ class Navigator(BaseHardware):
             logger.error("Cannot find transform from base link")
             return None
 
-    def transform_point(self, point: np.ndarray | list | Point) -> Optional[Point]:
+    def transform_point(self, point: Union[np.ndarray, list, Point]) -> Optional[Point]:
         """
         Transform a point on the chassis to world coordinates.
 
@@ -231,9 +231,9 @@ class Navigator(BaseHardware):
         if self.trans is None:
             logger.error("Cannot find transform from base link, so cannot transform point")
 
-        if isinstance(point, np.ndarray) or isinstance(point, list):
+        if isinstance(point, (np.ndarray, list)):
             point = Point(x=point[0], y=point[1], z=point[2])
-        else:
+        elif not isinstance(point, Point):
             logger.warning("Cannot transform point from type {}".format(type(point)))
             return None
 
