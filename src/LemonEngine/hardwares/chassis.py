@@ -270,34 +270,47 @@ class Navigator(BaseHardware):
         roll, pitch, yaw = euler_from_quaternion(q)
         return x, y, yaw
 
-    def move_to(self, x, y, theta) -> bool:
+    def move_to(self, x: float, y: float, theta: float, max_retry: int = 0) -> bool:
         """
-        navigate chassis to a specific location
+        Navigate chassis to a specific location with an optional retry mechanism.
 
-        :param x: x
-        :param y: y
-        :param theta: yaw
-        :return: success or not
+        :param x: x-coordinate in the map frame.
+        :param y: y-coordinate in the map frame.
+        :param theta: yaw/orientation in the map frame.
+        :param max_retry: The number of times to retry navigation if it fails. Defaults to 0 (one attempt, no retries).
+        :return: True if the location was reached successfully, False otherwise.
         """
-        self.clear_costmaps()
-
+        # Ensure max_retry is a non-negative integer
+        max_retry = max(0, int(max_retry))
         location = Navigator.flat_point_to_pose(x, y, theta)
 
-        self.goal = MoveBaseGoal()
-        self.goal.target_pose.header.frame_id = self.frame_id
-        self.goal.target_pose.header.stamp = rospy.Time.now()
-        self.goal.target_pose.pose = location
-        self.move_base.send_goal(self.goal)
+        for attempt in range(max_retry + 1):
+            if attempt > 0:
+                logger.info("Retrying navigation... Attempt {} of {}.".format(attempt + 1, max_retry + 1))
+            else:
+                logger.info("Navigating to (x={:.2f}, y={:.2f}, theta={:.2f}).".format(x, y, theta))
 
-        rospy.sleep(1)
-        success = self.move_base.wait_for_result(rospy.Duration(300))
+            self.clear_costmaps()
 
-        if success:
-            logger.info("Reached point.")
-        else:
-            logger.warning("Failed to reach point.")
+            self.goal = MoveBaseGoal()
+            self.goal.target_pose.header.frame_id = self.frame_id
+            self.goal.target_pose.header.stamp = rospy.Time.now()
+            self.goal.target_pose.pose = location
+            self.move_base.send_goal(self.goal)
 
-        return success
+            success = self.move_base.wait_for_result(rospy.Duration(300))
+
+            if success:
+                logger.success("Reached point successfully on attempt {}.".format(attempt + 1))
+                return True
+            else:
+                self.cancel_goal()  # Cancel the current goal before retrying
+                logger.warning("Failed to reach point on attempt {}.".format(attempt + 1))
+                if attempt < max_retry:
+                    rospy.sleep(1.0) # Wait a second before the next attempt
+
+        logger.error("Failed to reach the point after {} total attempts.".format(max_retry + 1))
+        return False
 
     def cancel_goal(self) -> None:
         """
