@@ -1,5 +1,5 @@
 import genpy
-import rospy
+import rospy, os
 from LemonEngine.utils.checker import Checker
 from LemonEngine.hardwares.hardware import BaseHardware
 from LemonEngine.sensors.sensor import Sensor
@@ -12,12 +12,14 @@ class Respeaker(BaseHardware):
     """
     API wrapper for https://github.com/supercatex/mr_voice
     """
-    def __init__(self):
+    def __init__(self， enable_espeak_fix: bool = False):
         """
         Constructor
         """
         super().__init__()
-        Checker().check_topic_status("/speaker/say", required=True)
+        if not enable_espeak_fix:
+            Checker().check_topic_status("/speaker/say", required=True)
+        self.enable_espeak_fix = enable_espeak_fix
         self.publisher = rospy.Publisher('/speaker/say', String, queue_size=5)
         self.mic = Sensor("/voice/text", Voice, callback_message=self.custom_callback)
         self.get_voice_text, _ = self.mic.data_field("data")
@@ -38,4 +40,8 @@ class Respeaker(BaseHardware):
         :return:
         """
         logger.info(f"speak: \"{text}\"")
-        self.publisher.publish(String(data=text))
+        if not self.enable_espeak_fix:
+            self.publisher.publish(String(data=text))
+            return
+
+        os.system(f'espeak -s 120 "{text}"')
