@@ -328,7 +328,7 @@ class Navigator(BaseHardware):
         :return:
         """
         logger.debug("Costmap clearing...")
-        self._clear_costmaps()
+        self._clear_costmaps
 
     def get_goal_current_status(self) -> GoalStatus:
         """
