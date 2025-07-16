@@ -191,7 +191,7 @@ class Navigator(BaseHardware):
         self.move_base = actionlib.SimpleActionClient("move_base", MoveBaseAction)
 
         self._amcl_pose: Sensor[PoseWithCovarianceStamped] = Sensor("/amcl_pose", PoseWithCovarianceStamped)
-        self._move_base_goal: Sensor[PoseStamped] = Sensor("/move_base_simple/goal", PoseStamped)
+        self._move_base_goal: Sensor[PoseStamped] = Sensor("/move_base_simple/goal", PoseStamped, wait_for_message=False)
         self._move_base_status: Sensor[GoalStatusArray] = Sensor("/move_base/status", GoalStatusArray)
 
         self._clear_costmaps = rospy.ServiceProxy("/move_base/clear_costmaps", Empty)
