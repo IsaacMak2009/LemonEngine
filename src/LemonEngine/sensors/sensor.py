@@ -12,6 +12,7 @@ class BaseSensor:
     def __init__(self,
                  topic_name: str,
                  message_type: Type[genpy.Message],
+                 wait_for_message: bool = True,
                  timeout: Optional[Union[rospy.Duration, float]] = None) -> None:
         """
         A base class for sensor objects. Available events:
@@ -40,7 +41,10 @@ class BaseSensor:
             rospy.on_shutdown(self.on_stop)
 
             # wait for the first message
-            message = rospy.wait_for_message(self.topic_name, self.message_type, timeout)
+            if wait_for_message:
+                message = rospy.wait_for_message(self.topic_name, self.message_type, timeout)
+            else:
+                message = self.message_type()
 
             logger.info(f"Received first message from {topic_name}")
             logger.success(f"Sensor at {topic_name} is ready!!")
@@ -158,6 +162,7 @@ class Sensor(BaseSensor, Generic[R]):
     def __init__(self,
                  topic_name: str,
                  message_type: Type[R],
+                 wait_for_message: bool = True,
                  callback_message: Optional[Callable[[genpy.Message], None]] = None,
                  callback_on_ready: Optional[Callable[[genpy.Message], None]] = None,
                  callback_on_start: Optional[Callable[[], None]] = None,
@@ -182,7 +187,7 @@ class Sensor(BaseSensor, Generic[R]):
         self.get_data: Callable[[], R] = _getter
         self._set_data: Callable[[R], None] = _setter
 
-        super().__init__(topic_name=topic_name, message_type=message_type, *args, **kwargs)
+        super().__init__(topic_name=topic_name, message_type=message_type, wait_for_message=wait_for_message, *args, **kwargs)
 
     def on_ready(self, message) -> None:
         if self.callback_on_ready:
