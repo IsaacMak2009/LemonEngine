@@ -12,7 +12,7 @@ class Respeaker(BaseHardware):
     """
     API wrapper for https://github.com/supercatex/mr_voice
     """
-    def __init__(self， enable_espeak_fix: bool = False):
+    def __init__(self, enable_espeak_fix: bool = False):
         """
         Constructor
         """
@@ -25,7 +25,7 @@ class Respeaker(BaseHardware):
         self.get_voice_text, _ = self.mic.data_field("data")
 
     @staticmethod
-    def custom_callback(msg: Voice | genpy.Message) -> None:
+    def custom_callback(msg: Union[Voice, genpy.Message]) -> None:
         """
         custom callback function to log the message and direction
         :param msg: the message from the `/voice/text`
