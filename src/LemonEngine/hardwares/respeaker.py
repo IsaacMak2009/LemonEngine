@@ -1,5 +1,6 @@
 import genpy
 import rospy, os
+from typing import *
 from LemonEngine.utils.checker import Checker
 from LemonEngine.hardwares.hardware import BaseHardware
 from LemonEngine.sensors.sensor import Sensor
