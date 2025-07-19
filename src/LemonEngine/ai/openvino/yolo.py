@@ -269,6 +269,25 @@ class YoloSegment(BaseOpenvinoModel):
 
 
 class YoloPose(BaseOpenvinoModel):
+    
+    Nose = 0
+    Left_Eye = 1
+    Right_Eye = 2
+    Left_Ear = 3
+    Right_Ear = 4
+    Left_Shoulder = 5
+    Right_Shoulder = 6
+    Left_Elbow = 7
+    Right_Elbow = 8
+    Left_Wrist = 9
+    Right_Wrist = 10
+    Left_Hip = 11
+    Right_Hip = 12
+    Left_Knee = 13
+    Right_Knee = 14
+    Left_Ankle = 15
+    Right_Ankle = 16
+
     def __init__(self,
                  model_name: str = "yolov8n-pose",
                  device_name: str = "CPU",
@@ -316,6 +335,26 @@ class YoloPose(BaseOpenvinoModel):
     ):
         """
         YOLOv8 model postprocessing function. Applied non-maximum suppression algorithm to detections and rescale boxes to original image size
+        
+        1. Nose
+        2. Left Eye
+        3. Right Eye
+        4. Left Ear
+        5. Right Ear
+        6. Left Shoulder
+        7. Right Shoulder
+        8. Left Elbow
+        9. Right Elbow
+        10. Left Wrist
+        11. Right Wrist
+        12. Left Hip
+        13. Right Hip
+        14. Left Knee
+        15. Right Knee
+        16. Left Ankle
+        17. Right Ankle
+
+        
         Parameters:
             pred_boxes (np.ndarray): model output prediction boxes
             input_hw (np.ndarray): preprocessed image
